@@ -10,7 +10,7 @@ struct ContentView: View {
     private let indexOfRefractionInSilicaAt680nm = 1.4558
     private let indexOfRefractionInSilicaAt420nm = 1.4681
 
-    @State private var incomingAngle = Vector(1,0,0)//Measurement(value: 0, unit: UnitAngle.degrees)
+    @State private var incomingAngle = Measurement(value: 0, unit: UnitAngle.degrees)
     @State private var outgoingAngle = Measurement(value: 0, unit: UnitAngle.degrees)
 
     @State private var firstPrismAngle = Measurement(value: 90, unit: UnitAngle.degrees)
@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var testRot = Measurement(value: 0, unit: UnitAngle.degrees)
 
     @State private var eyeDistance = Measurement(value: 100.0, unit: UnitLength.millimeters)
+
+    @State private var inputVector = Vector(1, 0, 0)
 
     // visible light is 420 to 680 nm
     // fused silica: https://www.filmetrics.com/refractive-index-database/SiO2/Fused-Silica-Silica-Silicon-Dioxide-Thermal-Oxide-ThermalOxide
@@ -40,8 +42,6 @@ struct ContentView: View {
         let firstFaceMid: Point = center + Vector(-prismThickness.value / 2.0, 0.0, 0.0).rotated(by: testRot.quat)
         let secondFaceMid: Point = center + Vector(prismThickness.value / 2.0, 0.0, 0.0).rotated(by: testRot.quat)
         let origin: Point = firstFaceMid + (incomingAngle.vector.negated * eyeDistance.value).rotated(by: testRot.quat)
-
-        let normal = RefractionPath.normalVectorFrom(incidence: incomingAngle.vector, refraction: outgoingAngle.vector, ior: outerRafractiveIndex / innerRefractiveIndex)
 
         let refractionPath = RefractionPath(origin: origin,
                                             incomingRay: incomingAngle.vector.rotated(by: testRot.quat),
@@ -74,9 +74,9 @@ struct ContentView: View {
                 VStack {
                     HStack {
                         Text("Incoming Angle:")
-                        TextField("", value: $incomingAngle.degrees, format: degreeFormat)
-                        AnglePreview(angle: $incomingAngle.degrees)
-                        Slider(value: $incomingAngle.degrees.value, in: -90.0 ... 90.0)
+                        TextField("", value: $incomingAngle, format: degreeFormat)
+                        AnglePreview(angle: $incomingAngle)
+                        Slider(value: $incomingAngle.value, in: -90.0 ... 90.0)
                     }
 
                     HStack {
@@ -97,6 +97,7 @@ struct ContentView: View {
                 }
 
                 HStack {
+                    VectorInput(vector: $inputVector)
                     Text("Test Rot:")
                     TextField("", value: $testRot, format: degreeFormat)
                     AnglePreview(angle: $testRot)
@@ -385,7 +386,7 @@ extension Double {
 
 extension Vector {
     func toFixed(fractions: ClosedRange<Int> = 2 ... 4) -> String {
-        return "\(x.toFixed(fractions: fractions)), \(y.toFixed(fractions: fractions)), \(z.toFixed(fractions: fractions)))"
+        return "(\(x.toFixed(fractions: fractions)), \(y.toFixed(fractions: fractions)), \(z.toFixed(fractions: fractions)))"
     }
 }
 
