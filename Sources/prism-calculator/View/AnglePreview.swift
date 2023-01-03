@@ -1,19 +1,11 @@
-//
-//  SwiftUIView.swift
-//  
-//
-//  Created by Nisse Bergman on 2022-12-22.
-//
-
-import SwiftUI
 import simd
+import SwiftUI
 
 struct AnglePreview: View {
-
     @Binding var angle: Measurement<UnitAngle>
 
     var body: some View {
-        Canvas() { context, size in
+        Canvas { context, size in
 
             let scale = 10.0
             let vector = angle.vector
@@ -38,13 +30,11 @@ struct AnglePreview: View {
     }
 }
 
-
 struct VectorPreview: View {
-
     @Binding var vector: Vector
 
     var body: some View {
-        Canvas() { context, size in
+        Canvas { context, size in
 
             let scale = 10.0
             let center: Vector = [size.width, size.height, 0.0] / 2.0

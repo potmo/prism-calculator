@@ -7,11 +7,10 @@ typealias Vector = SIMD3<Double>
 typealias Quat = simd_quatd
 
 struct ContentView: View {
-
     private let indexOfRefractionInSilicaAt680nm = 1.4558
     private let indexOfRefractionInSilicaAt420nm = 1.4681
 
-    @State private var incomingAngle = Measurement(value: 0, unit: UnitAngle.degrees)
+    @State private var incomingAngle = Vector(1,0,0)//Measurement(value: 0, unit: UnitAngle.degrees)
     @State private var outgoingAngle = Measurement(value: 0, unit: UnitAngle.degrees)
 
     @State private var firstPrismAngle = Measurement(value: 90, unit: UnitAngle.degrees)
@@ -21,6 +20,7 @@ struct ContentView: View {
     @State private var secondPrismLength = Measurement(value: 200.0, unit: UnitLength.millimeters)
     @State private var prismThickness = Measurement(value: 50.0, unit: UnitLength.millimeters)
 
+    @State private var testRot = Measurement(value: 0, unit: UnitAngle.degrees)
 
     @State private var eyeDistance = Measurement(value: 100.0, unit: UnitLength.millimeters)
 
@@ -37,83 +37,105 @@ struct ContentView: View {
         // this doesnt really matter
         let center = Point(x: 0.0, y: 0.0, z: 0.0)
 
-        let firstFaceMid: Point = center + [-prismThickness.value/2.0, 0.0, 0.0]
-        let secondFaceMid: Point = center + [prismThickness.value/2.0, 0.0, 0.0]
-        let origin: Point = firstFaceMid + incomingAngle.vector.negated * eyeDistance.value
+        let firstFaceMid: Point = center + Vector(-prismThickness.value / 2.0, 0.0, 0.0).rotated(by: testRot.quat)
+        let secondFaceMid: Point = center + Vector(prismThickness.value / 2.0, 0.0, 0.0).rotated(by: testRot.quat)
+        let origin: Point = firstFaceMid + (incomingAngle.vector.negated * eyeDistance.value).rotated(by: testRot.quat)
 
-        guard let refractionPath = RefractionPath(origin: origin,
-                                                  incomingRay: incomingAngle.vector,
-                                                  outgoingRay: outgoingAngle.vector,
-                                                  innerRefractiveIndex: innerRefractiveIndex,
-                                                  outerRefractiveIndex: outerRafractiveIndex,
-                                                  firstFaceMid: firstFaceMid,
-                                                  secondFaceMid: secondFaceMid) else {
-            print("failed getting path")
-            return
+        let normal = RefractionPath.normalVectorFrom(incidence: incomingAngle.vector, refraction: outgoingAngle.vector, ior: outerRafractiveIndex / innerRefractiveIndex)
+
+        let refractionPath = RefractionPath(origin: origin,
+                                            incomingRay: incomingAngle.vector.rotated(by: testRot.quat),
+                                            outgoingRay: outgoingAngle.vector.rotated(by: testRot.quat),
+                                            innerRefractiveIndex: innerRefractiveIndex,
+                                            outerRefractiveIndex: outerRafractiveIndex,
+                                            firstFaceMid: firstFaceMid,
+                                            secondFaceMid: secondFaceMid)
+
+        if let first = refractionPath.first {
+            self.firstPrismAngle = (-first.normal.cross(Vector(0.0, 0.0, 1.0))).degrees
         }
 
-        self.firstPrismAngle = (-refractionPath.firstFaceNormal.cross([0.0,0.0,1.0])).degrees
-        self.secondPrismAngle = (refractionPath.secondFaceNormal.cross([0.0,0.0,1.0])).degrees
+        if let second = refractionPath.second {
+            self.secondPrismAngle = (second.normal.cross(Vector(0.0, 0.0, 1.0))).degrees
+        }
+
+        /*
+         let incidenceVector = incomingAngle.quat.act([1, 0, 0])
+         let firstFaceNormal = RefractionPath.normalVectorFrom(incidence: incidenceVector, refraction: [1, 0, 0], ior: outerRafractiveIndex / innerRefractiveIndex)
+         let otherFirstPrismAngle = Measurement<UnitAngle>(value: firstFaceNormal.angleBetween(and: [-1, 0, 0]), unit: .radians).converted(to: .degrees) + Measurement(value: 90, unit: .degrees)
+
+         print("new: \(self.firstPrismAngle.value.toFixed()) old: \(otherFirstPrismAngle.value.toFixed()))")
+          */
     }
 
     var body: some View {
-        VStack(alignment: .leading){
+        VStack(alignment: .leading) {
             VStack(alignment: .leading, spacing: 1) {
-
                 VStack {
                     HStack {
                         Text("Incoming Angle:")
-                        TextField("", value: $incomingAngle, format: degreeFormat)
-                        AnglePreview(angle: $incomingAngle)
-                        Slider(value: $incomingAngle.value, in: -90...90)
+                        TextField("", value: $incomingAngle.degrees, format: degreeFormat)
+                        AnglePreview(angle: $incomingAngle.degrees)
+                        Slider(value: $incomingAngle.degrees.value, in: -90.0 ... 90.0)
                     }
 
                     HStack {
                         Text("Outgoing Angle:")
                         TextField("", value: $outgoingAngle, format: degreeFormat)
                         AnglePreview(angle: $outgoingAngle)
-                        Slider(value: $outgoingAngle.value, in: -90...90)
+                        Slider(value: $outgoingAngle.value, in: -90 ... 90)
                     }
                 }
-                .onChange(of: outgoingAngle){outgoingAngle in
+                .onChange(of: outgoingAngle) { outgoingAngle in
                     updatePrismAngles(incomingAngle: incomingAngle, outgoingAngle: outgoingAngle)
                 }
-                .onChange(of: incomingAngle){ incomingAngle in
+                .onChange(of: incomingAngle) { incomingAngle in
                     updatePrismAngles(incomingAngle: incomingAngle, outgoingAngle: outgoingAngle)
+                }
+                .onChange(of: testRot) { _ in
+                    updatePrismAngles(incomingAngle: incomingAngle, outgoingAngle: outgoingAngle)
+                }
+
+                HStack {
+                    Text("Test Rot:")
+                    TextField("", value: $testRot, format: degreeFormat)
+                    AnglePreview(angle: $testRot)
+                    VectorPreview(vector: .constant(testRot.vector))
+                    Slider(value: $testRot.value, in: 0 ... 360)
                 }
 
                 HStack {
                     Text("First face angle:")
                     TextField("", value: $firstPrismAngle, format: degreeFormat)
                     AnglePreview(angle: $firstPrismAngle)
-                    VectorPreview(vector: .constant(firstPrismAngle.vector.cross(Vector(x: 0, y:0, z:1)).negated))
-                    Slider(value: $firstPrismAngle.value, in: 0...180)
+                    VectorPreview(vector: .constant(firstPrismAngle.vector.cross(Vector(x: 0, y: 0, z: 1)).negated))
+                    Slider(value: $firstPrismAngle.value, in: 0 ... 180)
                 }
 
                 HStack {
                     Text("Second face angle:")
                     TextField("", value: $secondPrismAngle, format: degreeFormat)
                     AnglePreview(angle: $secondPrismAngle)
-                    VectorPreview(vector: .constant(secondPrismAngle.vector.cross(Vector(x: 0, y:0, z:1))))
-                    Slider(value: $secondPrismAngle.value, in: 0...180)
+                    VectorPreview(vector: .constant(secondPrismAngle.vector.cross(Vector(x: 0, y: 0, z: 1))))
+                    Slider(value: $secondPrismAngle.value, in: 0 ... 180)
                 }
 
                 HStack {
                     Text("First face length:")
                     TextField("", value: $firstPrismLength, format: millimeterFormat)
-                    Slider(value: $firstPrismLength.value, in: 0...200)
+                    Slider(value: $firstPrismLength.value, in: 0 ... 200)
                 }
 
                 HStack {
                     Text("Second face length:")
                     TextField("", value: $secondPrismLength, format: millimeterFormat)
-                    Slider(value: $secondPrismLength.value, in: 0...200)
+                    Slider(value: $secondPrismLength.value, in: 0 ... 200)
                 }
 
                 HStack {
                     Text("Prism thickness:")
                     TextField("", value: $prismThickness, format: millimeterFormat)
-                    Slider(value: $prismThickness.value, in: 0...200)
+                    Slider(value: $prismThickness.value, in: 0 ... 200)
                 }
 
                 HStack {
@@ -134,17 +156,17 @@ struct ContentView: View {
 
                 let center = Vector(x: size.width / 2, y: size.height / 2, z: 0)
 
-                let firstFaceMid = center + [-prismThickness.value/2, 0, 0]
-                let secondFaceMid = center + [prismThickness.value/2, 0, 0]
+                let firstFaceMid = center + Vector(-prismThickness.value / 2, 0, 0).rotated(by: testRot.quat)
+                let secondFaceMid = center + Vector(prismThickness.value / 2, 0, 0).rotated(by: testRot.quat)
 
-                let prismTopLeft = firstFaceMid - firstPrismAngle.vector * firstPrismLength.value / 2
-                let prismBottomLeft = firstFaceMid + firstPrismAngle.vector * firstPrismLength.value / 2
+                let prismTopLeft = firstFaceMid - (firstPrismAngle.vector * firstPrismLength.value / 2).rotated(by: testRot.quat)
+                let prismBottomLeft = firstFaceMid + (firstPrismAngle.vector * firstPrismLength.value / 2).rotated(by: testRot.quat)
 
+                let prismTopRight = secondFaceMid - (secondPrismAngle.vector * secondPrismLength.value / 2).rotated(by: testRot.quat)
+                let prismBottomRight = secondFaceMid + (secondPrismAngle.vector * secondPrismLength.value / 2).rotated(by: testRot.quat)
 
-                let prismTopRight = secondFaceMid - secondPrismAngle.vector * secondPrismLength.value / 2
-                let prismBottomRight = secondFaceMid + secondPrismAngle.vector * secondPrismLength.value / 2
-
-                let (firstFaceNormalVector, secondFaceNormalVector) = getNormals()
+                let firstFaceNormalVector = firstPrismAngle.vector.cross(Vector(0, 0, 1)).negated.rotated(by: testRot.quat)
+                let secondFaceNormalVector = secondPrismAngle.vector.cross(Vector(0, 0, 1)).rotated(by: testRot.quat)
 
                 var prismPath = Path()
                 prismPath.move(to: prismTopLeft)
@@ -152,7 +174,6 @@ struct ContentView: View {
                 prismPath.addLine(to: prismBottomRight)
                 prismPath.addLine(to: prismBottomLeft)
                 prismPath.closeSubpath()
-
 
                 var firstFaceNormalPath = Path()
                 firstFaceNormalPath.move(to: firstFaceMid + firstFaceNormalVector * 10)
@@ -162,16 +183,14 @@ struct ContentView: View {
                 secondFaceNormalPath.move(to: secondFaceMid + secondFaceNormalVector * 10)
                 secondFaceNormalPath.addLine(to: secondFaceMid - secondFaceNormalVector * 5)
 
-
-
-                //let refractiveIndices: StrideTo<Double> = stride(from: indexOfRefractionInSilicaAt680nm, to: indexOfRefractionInSilicaAt420nm, by: 0.001)
-                //let rayPaths = stride(from: -30.0, to: 30.0, by: 5.0).flatMap{offset in
-                //return refractiveIndices.map{ innerRefractiveIndex -> Path in
+                // let refractiveIndices: StrideTo<Double> = stride(from: indexOfRefractionInSilicaAt680nm, to: indexOfRefractionInSilicaAt420nm, by: 0.001)
+                // let rayPaths = stride(from: -30.0, to: 30.0, by: 5.0).flatMap{offset in
+                // return refractiveIndices.map{ innerRefractiveIndex -> Path in
 
                 let offset = 0.0
-                let origin = firstFaceMid + incomingAngle.vector.negated * eyeDistance.value + Vector(x: 0.0, y: 1.0, z: 0.0).scaled(by: offset * 2.0)
+                let origin = firstFaceMid + (incomingAngle.vector.negated * eyeDistance.value + Vector(x: 0.0, y: 1.0, z: 0.0).scaled(by: offset * 2.0)).rotated(by: testRot.quat)
 
-                let rayPath: Path = pathForRay(incommingRay: incomingAngle.vector,
+                let rayPath: Path = pathForRay(incommingRay: incomingAngle.vector.rotated(by: testRot.quat),
                                                origin: origin,
                                                innerRefractiveIndex: innerRefractiveIndex,
                                                outerRefractiveIndex: outerRafractiveIndex,
@@ -180,24 +199,20 @@ struct ContentView: View {
                                                secondFaceMid: secondFaceMid,
                                                secondFaceNormal: secondFaceNormalVector)
                 let rayPaths = [rayPath]
-                //}
-                //}
-
+                // }
+                // }
 
                 context.transform = CGAffineTransform(scaleX: 1, y: 1)
                 context.stroke(prismPath, with: .color(.blue), style: StrokeStyle(lineWidth: 0.5))
-                context.stroke(firstFaceNormalPath, with: .color(.gray), style: StrokeStyle(lineWidth: 0.5, dash: [1,1]))
-                context.stroke(secondFaceNormalPath, with: .color(.gray), style: StrokeStyle(lineWidth: 0.5, dash: [1,1]))
+                context.stroke(firstFaceNormalPath, with: .color(.gray), style: StrokeStyle(lineWidth: 0.5, dash: [1, 1]))
+                context.stroke(secondFaceNormalPath, with: .color(.gray), style: StrokeStyle(lineWidth: 0.5, dash: [1, 1]))
                 for rayPath in rayPaths {
                     context.stroke(rayPath, with: .color(.red.opacity(1.0)), style: StrokeStyle(lineWidth: 0.5))
                 }
-
-
             }
             .background(content: { Color.white })
         }
     }
-
 
     func pathForRay(incommingRay: Vector,
                     origin: Point,
@@ -207,51 +222,45 @@ struct ContentView: View {
                     firstFaceNormal: Vector,
                     secondFaceMid: Point,
                     secondFaceNormal: Vector) -> Path {
-
         var path = Path()
-        guard let refractionPath = RefractionPath(origin: origin,
-                                                  incomingRay: incommingRay,
-                                                  innerRefractiveIndex: innerRefractiveIndex,
-                                                  outerRefractiveIndex: outerRefractiveIndex,
-                                                  firstFaceMid: firstFaceMid,
-                                                  firstFaceNormal: firstFaceNormal,
-                                                  secondFaceMid: secondFaceMid,
-                                                  secondFaceNormal: secondFaceNormal) else {
+        let refractionPath = RefractionPath(origin: origin,
+                                            incomingRay: incommingRay,
+                                            innerRefractiveIndex: innerRefractiveIndex,
+                                            outerRefractiveIndex: outerRefractiveIndex,
+                                            firstFaceMid: firstFaceMid,
+                                            firstFaceNormal: firstFaceNormal,
+                                            secondFaceMid: secondFaceMid,
+                                            secondFaceNormal: secondFaceNormal)
+
+        guard let first = refractionPath.first else {
             return path
         }
 
-        let computedNormal = RefractionPath.normalVectorFrom(incidence: refractionPath.incomingVector,
-                                                             refraction: refractionPath.firstRefractionVector,
-                                                             ior: outerRefractiveIndex/innerRefractiveIndex)
-
-        print("difference between computed and actual: " + (firstFaceNormal - computedNormal).toFixed() + " length \(computedNormal.length)")
-
-        path.addArc(center: refractionPath.origin,
+        path.addArc(center: first.origin,
                     radius: 3,
                     startAngle: 0,
                     endAngle: .pi * 2,
                     clockwise: true)
 
-        path.move(to: refractionPath.origin)
-        path.addLine(to: refractionPath.firstHitPoint)
-        path.addLine(to: refractionPath.secondHitPoint)
-        path.addLine(to: refractionPath.secondHitPoint + refractionPath.emergenceVector * 100)
+        path.move(to: first.origin)
+        path.addLine(to: first.incidencePoint)
+
+        guard let second = refractionPath.second else {
+            return path
+        }
+
+        path.addLine(to: second.incidencePoint)
+        path.addLine(to: second.incidencePoint + second.refractionVector * 100)
 
         return path
-
     }
 
     func getNormals() -> (firstNormal: Vector, secondNormal: Vector) {
-        let firstFaceNormalVector = firstPrismAngle.vector.cross([0,0,1]) * -1
-        let secondFaceNormalVector = secondPrismAngle.vector.cross([0,0,1])
+        let firstFaceNormalVector = firstPrismAngle.vector.cross([0, 0, 1]) * -1
+        let secondFaceNormalVector = secondPrismAngle.vector.cross([0, 0, 1])
         return (firstNormal: firstFaceNormalVector, secondNormal: secondFaceNormalVector)
     }
 }
-
-
-
-
-
 
 precedencegroup ExponentiativePrecedence {
     associativity: right
@@ -260,34 +269,49 @@ precedencegroup ExponentiativePrecedence {
 
 infix operator ^: ExponentiativePrecedence
 
-func ^ (num: Double, power: Double) -> Double{
+func ^ (num: Double, power: Double) -> Double {
     return pow(num, power)
 }
 
 extension Vector {
     func angleBetween(and other: Vector) -> Double {
-        let planeNormal: Vector = [0,0,1]
+        let planeNormal: Vector = [0, 0, 1]
         return atan2(self.normalized.cross(other.normalized).dot(planeNormal), self.normalized.dot(other.normalized))
     }
 }
 
 extension Vector {
     var degrees: Measurement<UnitAngle> {
-        //let quaternion = Quat(from: self, to: [1,0,0])
-        //return Measurement(value: quaternion.angle, unit: .radians).converted(to: .degrees)
-        return Measurement(value: self.angleBetween(and: [1,0,0]), unit: .radians).converted(to: .degrees)
+        get {
+            // let quaternion = Quat(from: self, to: [1,0,0])
+            // return Measurement(value: quaternion.angle, unit: .radians).converted(to: .degrees)
+            return Measurement(value: self.angleBetween(and: [1, 0, 0]), unit: .radians).converted(to: .degrees)
+        }
+        set {
+            self = newValue.quat.vector
+        }
     }
 }
 
+extension Vector {
+    func rotated(by quat: Quat) -> Vector {
+        return quat.act(self)
+    }
+}
 
+extension Vector {
+    init(_ x: Double, _ y: Double, _ z: Double) {
+        self.init(x: x, y: y, z: z)
+    }
+}
 
 extension simd_quatd {
     var opposite: simd_quatd {
-        return self * simd_quatd(angle: .pi, axis: [0,0,1])
+        return self * simd_quatd(angle: .pi, axis: [0, 0, 1])
     }
 
     var vector: SIMD3<Double> {
-        return self.act([1,0,0])
+        return self.act([1, 0, 0])
     }
 }
 
@@ -313,7 +337,6 @@ extension Path {
     mutating func addArc(center: Point, radius: Double, startAngle: Double, endAngle: Double, clockwise: Bool) {
         self.addArc(center: center.cgPoint, radius: radius, startAngle: Angle(radians: startAngle), endAngle: Angle(radians: endAngle), clockwise: clockwise)
     }
-
 }
 
 extension SIMD3 where Scalar == Double {
@@ -345,7 +368,7 @@ extension SIMD3 where Scalar == Double {
         return simd_cross(self, other)
     }
 
-    func dot( _ other: SIMD3<Scalar>) -> Scalar {
+    func dot(_ other: SIMD3<Scalar>) -> Scalar {
         return simd_dot(self, other)
     }
 }
@@ -361,13 +384,13 @@ extension Double {
 }
 
 extension Vector {
-    func toFixed(fractions: ClosedRange<Int> = 2...4) -> String {
+    func toFixed(fractions: ClosedRange<Int> = 2 ... 4) -> String {
         return "\(x.toFixed(fractions: fractions)), \(y.toFixed(fractions: fractions)), \(z.toFixed(fractions: fractions)))"
     }
 }
 
 extension Double {
-    func toFixed( fractions: ClosedRange<Int> = 2...4) -> String {
+    func toFixed(fractions: ClosedRange<Int> = 2 ... 4) -> String {
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "en-US")
         formatter.numberStyle = NumberFormatter.Style.decimal
