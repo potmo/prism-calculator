@@ -11,16 +11,6 @@ struct Refraction {
 }
 
 struct RefractionPath {
-    /*
-     let origin: Point
-     let firstHitPoint: Point
-     let secondHitPoint: Point
-     let emergenceVector: Vector
-     let incomingVector: Vector
-     let firstFaceNormal: Vector
-     let secondFaceNormal: Vector
-     let firstRefractionVector: Vector*/
-
     let first: Refraction?
     let second: Refraction?
 
@@ -85,9 +75,9 @@ struct RefractionPath {
         let refractedRay = Self.refract(incidence: incomingRay, normal: firstFaceNormal, ior: outerRefractiveIndex / innerRefractiveIndex)
 
         // note that this hits the face from behind so the normal should be inverted
-        let secondFaceNormal = Vector(0,1,0) /*-Self.normalVectorFrom(incidence: refractedRay,
-                                                      refraction: outgoingRay,
-                                                      ior: innerRefractiveIndex / outerRefractiveIndex)*/
+        let secondFaceNormal = -Self.normalVectorFrom(incidence: refractedRay,
+                                                     refraction: outgoingRay,
+                                                     ior: innerRefractiveIndex / outerRefractiveIndex)
 
         self.init(origin: origin,
                   incomingRay: incomingRay,
@@ -96,7 +86,7 @@ struct RefractionPath {
                   firstFaceMid: firstFaceMid,
                   firstFaceNormal: firstFaceNormal,
                   secondFaceMid: secondFaceMid,
-                  secondFaceNormal: [-1, 0, 0])
+                  secondFaceNormal: secondFaceNormal)
     }
 
     static func intersectPlane(normal: Vector, planeOrigin: Point, rayOrigin: Point, rayDirection: Vector) -> Vector? {
@@ -123,14 +113,13 @@ struct RefractionPath {
     }
 
     static func normalVectorFrom(incidence: Vector, refraction: Vector, ior: Double) -> Vector {
-
         // Determination of unit normal vectors of aspherical surfaces given unit directional vectors of incoming and outgoing rays: comment
         // Antonín Mikš and Pavel Novák, 2012
         let dotProduct = abs(incidence.dot(refraction) - ior) / sqrt(1 + pow(ior, 2) - 2 * ior * incidence.dot(refraction))
-        let normal = -((refraction - ior * incidence) / (sqrt(1 - pow(ior, 2) * (1 - pow(dotProduct, 2))) - ior * dotProduct))
+        let normal = ((refraction - ior * incidence) / (sqrt(1 - pow(ior, 2) * (1 - pow(dotProduct, 2))) - ior * dotProduct))
 
         print("incidence: \(incidence.toFixed()) (\(incidence.length)), refraction: \(refraction.toFixed()) (\(refraction.length)), normal: \(normal.toFixed()) (\(normal.length))")
-        return normal
+        return -normal
     }
 
     static func normalVectorFrom_old(incidence: Vector, refraction: Vector, ior: Double) -> Vector {
