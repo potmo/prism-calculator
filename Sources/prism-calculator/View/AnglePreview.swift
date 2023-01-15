@@ -1,7 +1,6 @@
 import simd
 import SwiftUI
 
-
 struct VectorPreview: View {
     @Binding var vector: Vector
 
@@ -61,7 +60,7 @@ struct VectorInput: View {
             context.stroke(path, with: .color(.purple), style: .init(lineWidth: 1))
 
         }.frame(width: 30, height: 30)
-            .gesture (
+            .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
                         vector = translationToVector(from: lastCommitedVector, with: gesture)
