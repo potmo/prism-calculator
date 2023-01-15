@@ -106,7 +106,7 @@ struct Vertice {
 
 enum Models {
     static func constructWorldOrigin() -> Entity {
-        let scale: Float = 0.1
+        let scale: Float = 0.3
         let x = ModelEntity(mesh: .generateBox(width: 1 * scale, height: 0.01 * scale, depth: 0.01 * scale), materials: [SimpleMaterial(color: .red, isMetallic: false)])
         let y = ModelEntity(mesh: .generateBox(width: 0.01 * scale, height: 1 * scale, depth: 0.01 * scale), materials: [SimpleMaterial(color: .green, isMetallic: false)])
         let z = ModelEntity(mesh: .generateBox(width: 0.01 * scale, height: 0.01 * scale, depth: 1 * scale), materials: [SimpleMaterial(color: .blue, isMetallic: false)])
@@ -128,7 +128,7 @@ enum Models {
 
         let lines: [[Vertice]] = stride(from: 0.0, through: 360.0, by: 360 / 20).map { line in
 
-            let angle: Double = -.pi * 2.0 * line / 360.0
+            let angle: Double = .pi * 2.0 * line / 360.0
             let perp = setup.prism.firstFace.normal.cross(.up) * rayRadius
             let hit = setup.prism.firstFace.pivot + Quat(angle: angle, axis: setup.prism.firstFace.normal).act(perp)
 
@@ -152,7 +152,7 @@ enum Models {
             return line
         }
 
-        return Self.rayModelFromVertices(lines: lines)
+        return Self.rayModelFromVertices(lines: lines, color: .red, opacity: 1.0)
     }
 
     static func constructRay(_ prism: Prism, rayStart: Point) -> ModelEntity {
@@ -162,7 +162,7 @@ enum Models {
 
         let lines: [[Vertice]] = stride(from: 0.0, through: 360.0, by: 360 / 20).map { line in
 
-            let angle: Double = -.pi * 2.0 * line / 360.0
+            let angle: Double = .pi * 2.0 * line / 360.0
             let perp = prism.firstFace.normal.cross(.up) * rayRadius
             let hit = prism.firstFace.pivot + Quat(angle: angle, axis: prism.firstFace.normal).act(perp)
 
@@ -196,10 +196,10 @@ enum Models {
             return line
         }
 
-        return Self.rayModelFromVertices(lines: lines)
+        return Self.rayModelFromVertices(lines: lines, color: .red, opacity: 1.0)
     }
 
-    private static func rayModelFromVertices(lines: [[Vertice]]) -> ModelEntity {
+    private static func rayModelFromVertices(lines: [[Vertice]], color: NSColor, opacity: Double) -> ModelEntity {
         var triangleIndices: [UInt32] = []
         var positions: [Vector] = []
         for line in lines {
@@ -221,15 +221,43 @@ enum Models {
                 let topRight = lines[(l + 1) % lines.count][s + 1].index
 
                 // first triangle
-                triangleIndices.append(bottomLeft)
-                triangleIndices.append(bottomRight)
                 triangleIndices.append(topLeft)
 
-                // secon triangle
-                triangleIndices.append(topLeft)
                 triangleIndices.append(bottomRight)
+                triangleIndices.append(bottomLeft)
+
+                // second triangle
                 triangleIndices.append(topRight)
+                triangleIndices.append(bottomRight)
+
+                triangleIndices.append(topLeft)
             }
+        }
+
+        let firstFaceVertices = lines.map(\.first!)
+        let lastFaceVertices = lines.map(\.last!)
+
+        // add first face cap (expecting there to be a start and end vertice)
+        let firstMidPoint = firstFaceVertices.map(\.position).reduce(Vector(0, 0, 0), +) / Double(lines.count)
+        positions.append(firstMidPoint)
+        let secondMidPoint = lastFaceVertices.map(\.position).reduce(Vector(0, 0, 0), +) / Double(lines.count)
+        positions.append(secondMidPoint)
+
+        let topVerticeIndex = lines.flatMap { $0 }.map(\.index).max()!
+        let firstMidIndex = topVerticeIndex + 1
+        let secondMidIndex = topVerticeIndex + 2
+
+        // add first cap
+        for index in firstFaceVertices.indices {
+            triangleIndices.append(firstFaceVertices[index].index)
+            triangleIndices.append(firstFaceVertices[(index + 1) % firstFaceVertices.count].index)
+            triangleIndices.append(firstMidIndex)
+        }
+
+        for index in firstFaceVertices.indices {
+            triangleIndices.append(secondMidIndex)
+            triangleIndices.append(lastFaceVertices[(index + 1) % lastFaceVertices.count].index)
+            triangleIndices.append(lastFaceVertices[index].index)
         }
 
         var descriptor = MeshDescriptor(name: "ray")
@@ -238,11 +266,15 @@ enum Models {
         descriptor.primitives = .triangles(triangleIndices)
 
         var material = PhysicallyBasedMaterial()
-        material.baseColor = PhysicallyBasedMaterial.BaseColor(tint: .red)
+        material.baseColor = PhysicallyBasedMaterial.BaseColor(tint: color)
         material.roughness = 1.0
         material.metallic = 0.0
-        material.blending = .opaque
-        material.faceCulling = .none
+        if opacity >= 1 {
+            material.blending = .opaque
+        } else {
+            material.blending = .transparent(opacity: .init(floatLiteral: Float(opacity)))
+        }
+        material.faceCulling = .back
         material.sheen = .none
         let mesh = try! MeshResource.generate(from: [descriptor])
 
@@ -252,96 +284,45 @@ enum Models {
     }
 
     static func constructPrism(_ prism: Prism) -> ModelEntity {
-        var positions: [Vector] = []
-        var triangleIndices: [UInt32] = []
+        let silhuette: [SIMD2<Double>] = [
+            SIMD2(x: -0.5, y: -0.5),
+            SIMD2(x: 0.5, y: -0.5),
+            SIMD2(x: 0.5, y: 0.5),
+            SIMD2(x: -0.5, y: 0.5),
+        ]
 
-        positions.append(prism.firstFace.bottomLeft)
-        positions.append(prism.firstFace.bottomRight)
-        positions.append(prism.firstFace.topLeft)
-        positions.append(prism.firstFace.topRight)
+        let prismDirection = (prism.firstFace.pivot - prism.secondFace.pivot).normalized
+        let right = Vector.up.cross(prismDirection)
+        let up = prismDirection.cross(right)
 
-        positions.append(prism.secondFace.bottomRight)
-        positions.append(prism.secondFace.bottomLeft)
-        positions.append(prism.secondFace.topRight)
-        positions.append(prism.secondFace.topLeft)
+        let lines: [[Vertice]] = silhuette.enumerated().map { (index: Int, point: SIMD2<Double>) in
 
-        // Front Triangle 1
-        triangleIndices.append(0)
-        triangleIndices.append(1)
-        triangleIndices.append(2)
+            let x: Vector = right * point.x
+            let y: Vector = up * point.y
+            let pointPosition = x + y
+            let offset: Vector = prismDirection * 100.0
+            let rayOrigin: Vector = prism.firstFace.pivot + pointPosition + offset
+            let firstFaceHit = RefractionPath.intersectPlane(normal: prism.firstFace.normal,
+                                                             planeOrigin: prism.firstFace.pivot,
+                                                             rayOrigin: rayOrigin,
+                                                             rayDirection: -prismDirection)
 
-        // Front Triangle 2
-        triangleIndices.append(2)
-        triangleIndices.append(1)
-        triangleIndices.append(3)
+            let secondFaceHit = RefractionPath.intersectPlane(normal: -prism.secondFace.normal,
+                                                              planeOrigin: prism.secondFace.pivot,
+                                                              rayOrigin: rayOrigin,
+                                                              rayDirection: -prismDirection)
 
-        // Back Triangle 1
-        triangleIndices.append(5)
-        triangleIndices.append(4)
-        triangleIndices.append(7)
+            guard let firstFaceHit, let secondFaceHit else {
+                fatalError("not possible to compute first or second face hits when constructing prism")
+            }
 
-        // Back Triangle 2
-        triangleIndices.append(7)
-        triangleIndices.append(4)
-        triangleIndices.append(6)
+            return [
+                Vertice(position: firstFaceHit, index: UInt32(index * 2)),
+                Vertice(position: secondFaceHit, index: UInt32(index * 2) + 1),
+            ]
+        }
 
-        // Right Triangle 1
-        triangleIndices.append(1)
-        triangleIndices.append(5)
-        triangleIndices.append(3)
-
-        // Right Triangle 2
-        triangleIndices.append(3)
-        triangleIndices.append(5)
-        triangleIndices.append(7)
-
-        // Left Triangle 1
-        triangleIndices.append(4)
-        triangleIndices.append(0)
-        triangleIndices.append(6)
-
-        // Left Triangle 2
-        triangleIndices.append(6)
-        triangleIndices.append(0)
-        triangleIndices.append(2)
-
-        // Bottom Triangle 1
-        triangleIndices.append(4)
-        triangleIndices.append(5)
-        triangleIndices.append(0)
-
-        // Bottom Triangle 2
-        triangleIndices.append(0)
-        triangleIndices.append(5)
-        triangleIndices.append(1)
-
-        // Top Triangle 1
-        triangleIndices.append(2)
-        triangleIndices.append(3)
-        triangleIndices.append(6)
-
-        // Top Triangle 2
-        triangleIndices.append(6)
-        triangleIndices.append(3)
-        triangleIndices.append(7)
-
-        var descriptor = MeshDescriptor(name: "prism")
-        let floatPositions: [simd_float3] = positions.map(\.fvector).map { [$0.x, $0.y, $0.z] }
-        descriptor.positions = MeshBuffer(floatPositions)
-        descriptor.primitives = .triangles(triangleIndices)
-
-        var material = PhysicallyBasedMaterial()
-        material.baseColor = PhysicallyBasedMaterial.BaseColor(tint: .blue)
-        material.roughness = 1.0
-        material.metallic = 0.0
-        material.blending = .transparent(opacity: 0.2)
-        material.faceCulling = .none
-        material.sheen = .none
-
-        let mesh = try! MeshResource.generate(from: [descriptor])
-
-        let model = ModelEntity(mesh: mesh, materials: [material])
-
-        return model
+        return Self.rayModelFromVertices(lines: lines, color: .blue, opacity: 0.2)
+       
     }
 }
