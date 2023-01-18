@@ -12,6 +12,20 @@ extension Vector {
     }
 }
 
+extension [Vector] {
+    var average: Vector {
+        let scale = 1.0 / Double(count)
+        return self.reduce(Point(0.0, 0.0, 0.0)) { prev, curr in prev + curr }
+            .scaled(by: scale)
+    }
+}
+
+extension SIMD2<Double> {
+    var vector: Vector {
+        return Vector(self.x, self.y, 0)
+    }
+}
+
 extension Vector {
     static var up: Vector {
         return Vector(x: 0, y: 1, z: 0)

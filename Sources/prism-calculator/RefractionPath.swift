@@ -14,43 +14,19 @@ struct Prism {
     let thickness: Double
     let firstFace: Face
     let secondFace: Face
+    let silhouette: [simd_double2]
 
-    init(thickness: Double, firstFace: Face, secondFace: Face) {
+    init(thickness: Double, firstFace: Face, secondFace: Face, silhouette: [simd_double2]) {
         self.thickness = thickness
         self.firstFace = firstFace
         self.secondFace = secondFace
+        self.silhouette = silhouette
     }
 
     struct Face {
         let normal: Vector
-        let width: Double
-        let height: Double
         let pivot: Point
         let indexOfRefraction: Double
-
-        private var right: Vector {
-            return normal.cross(.up) * -width / 2
-        }
-
-        private var up: Vector {
-            return normal.cross(.up).cross(normal) * height / 2
-        }
-
-        var topLeft: Point {
-            pivot - right + up
-        }
-
-        var topRight: Point {
-            pivot + right + up
-        }
-
-        var bottomLeft: Point {
-            pivot - right - up
-        }
-
-        var bottomRight: Point {
-            pivot + right - up
-        }
     }
 }
 
@@ -63,13 +39,12 @@ struct PrismConfiguration {
     let position: Point
     let generalDirection: Vector
     let thickness: Double
+    let silhouette: [simd_double2]
     let firstFace: FaceConfiguration
     let secondFace: FaceConfiguration
 }
 
 struct FaceConfiguration {
-    let width: Double
-    let height: Double
     let indexOfRefraction: Double
 }
 
@@ -120,15 +95,12 @@ struct Setup {
 
         self.prism = Prism(thickness: prismConfiguration.thickness,
                            firstFace: Prism.Face(normal: firstFaceNormal,
-                                                 width: prismConfiguration.firstFace.width,
-                                                 height: prismConfiguration.firstFace.height,
                                                  pivot: firstFaceMid,
                                                  indexOfRefraction: prismConfiguration.firstFace.indexOfRefraction),
                            secondFace: Prism.Face(normal: secondFaceNormal,
-                                                  width: prismConfiguration.secondFace.width,
-                                                  height: prismConfiguration.secondFace.height,
                                                   pivot: secondFaceMid,
-                                                  indexOfRefraction: prismConfiguration.secondFace.indexOfRefraction))
+                                                  indexOfRefraction: prismConfiguration.secondFace.indexOfRefraction),
+                           silhouette: prismConfiguration.silhouette)
         self.incidenceRay = Ray(origin: rayStartPosition,
                                 direction: incomingRay)
         self.refractionRay = Ray(origin: firstFaceHitPoint,

@@ -54,17 +54,21 @@ struct SinglePrismView: View {
         rootAnchor.name = rootName
         view.scene.addAnchor(rootAnchor)
 
+        let silhouette: [SIMD2<Double>] = [
+            SIMD2(x: -0.5, y: -0.5),
+            SIMD2(x: 0.5, y: -0.5),
+            SIMD2(x: 0.2, y: 0.2),
+            SIMD2(x: -0.5, y: 0.5),
+        ]
+
         let outerRefractiveIndex = 1.000293
         let innerRefractiveIndex = 1.52
         let prismConfig = PrismConfiguration(position: [0, 0, 0],
                                              generalDirection: [0, 0, 1],
                                              thickness: 0.5,
-                                             firstFace: FaceConfiguration(width: 1,
-                                                                          height: 1,
-                                                                          indexOfRefraction: outerRefractiveIndex / innerRefractiveIndex),
-                                             secondFace: FaceConfiguration(width: 1,
-                                                                           height: 1,
-                                                                           indexOfRefraction: innerRefractiveIndex / outerRefractiveIndex))
+                                             silhouette: silhouette,
+                                             firstFace: FaceConfiguration(indexOfRefraction: outerRefractiveIndex / innerRefractiveIndex),
+                                             secondFace: FaceConfiguration(indexOfRefraction: innerRefractiveIndex / outerRefractiveIndex))
 
         let setup = Setup(rayStartPosition: rayStart,
                           rayEndPosition: rayEnd,

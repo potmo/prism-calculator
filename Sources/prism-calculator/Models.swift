@@ -188,18 +188,11 @@ enum Models {
     }
 
     static func constructPrism(_ prism: Prism) -> ModelEntity {
-        let silhouette: [SIMD2<Double>] = [
-            SIMD2(x: -0.5, y: -0.5),
-            SIMD2(x: 0.5, y: -0.5),
-            SIMD2(x: 0.5, y: 0.5),
-            SIMD2(x: -0.5, y: 0.5),
-        ]
-
         let prismDirection = (prism.firstFace.pivot - prism.secondFace.pivot).normalized
         let right = Vector.up.cross(prismDirection)
         let up = prismDirection.cross(right)
 
-        let lines: [[Vertice]] = silhouette.enumerated().map { (index: Int, point: SIMD2<Double>) in
+        let lines: [[Vertice]] = prism.silhouette.enumerated().map { (index: Int, point: SIMD2<Double>) in
 
             let x: Vector = right * point.x
             let y: Vector = up * point.y
