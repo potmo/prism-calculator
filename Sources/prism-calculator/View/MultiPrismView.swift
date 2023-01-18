@@ -15,22 +15,15 @@ struct MultiPrismView: View {
         return view
     }()
 
-
-
     var body: some View {
         VStack {
-
-
             ARViewContainer(view: view)
                 .onAppear {
                     Self.updateModels(in: view, rayStart: start, rayEnd: end)
                 }
-
         }
     }
 
     static func updateModels(in view: CameraControlARView, rayStart: Point, rayEnd: Point) {
-
     }
 }
-
