@@ -3,7 +3,7 @@ import Foundation
 import RealityKit
 import SwiftUI
 
-struct ARDisplayView: View {
+struct SinglePrismView: View {
     @State private var rootAnchor = AnchorEntity()
 
     @State private var start = Point(0, 0, 3)
@@ -81,21 +81,3 @@ struct ARDisplayView: View {
         rootAnchor.addChild(axisModel)
     }
 }
-
-struct ARViewContainer: NSViewRepresentable {
-    typealias NSViewType = CameraControlARView
-
-    let view: CameraControlARView
-
-    init(view: CameraControlARView) {
-        self.view = view
-    }
-
-    func makeNSView(context: Context) -> CameraControlARView {
-        return view
-    }
-
-    func updateNSView(_ nsView: CameraControlARView, context: Context) {
-    }
-}
-

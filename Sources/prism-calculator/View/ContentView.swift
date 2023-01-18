@@ -9,7 +9,7 @@ struct ContentView: View {
                 show3d.toggle()
             }
             if show3d {
-                ARDisplayView()
+                SinglePrismView()
             } else {
                 FlatView()
             }
