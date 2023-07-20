@@ -35,6 +35,11 @@ struct Ray {
     let direction: Vector
 }
 
+struct Plane {
+    let pivot: Point
+    let normal: Vector
+}
+
 struct PrismConfiguration {
     let position: Point
     let generalDirection: Vector

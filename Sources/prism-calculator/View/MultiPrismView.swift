@@ -26,6 +26,7 @@ struct MultiPrismView: View {
     func updateModels(in view: CameraControlARView) {
         let prismBoardCenter = Point(0, 0, 0)
 
+        // these are positions relative to the prism position in the x,y plane
         let silhouettes: [[simd_double2]] = [
             [
                 [-1, 1],
@@ -47,19 +48,20 @@ struct MultiPrismView: View {
             ],
         ]
 
-        let imageSections = silhouettes.map { silhouette in ImageSection(silhouette: silhouette, hitCenter: Point(0, 0, -3)) }
+        let generalDirection: Vector = [0, 0, 1]
+        let patternPlane = Plane(pivot: Point(0, 0, -3), normal: generalDirection)
+
+        let imageSections = silhouettes.map { silhouette in ImageSection(silhouette: silhouette, hitCenter: patternPlane.pivot) }
 
         let outerRefractiveIndex = 1.000293
         let innerRefractiveIndex = 1.52
-
-        let generalDirection: Vector = [0, 0, 1]
 
         for imageSection in imageSections {
             let firstFace = FaceConfiguration(indexOfRefraction: outerRefractiveIndex / innerRefractiveIndex)
             let secondFace = FaceConfiguration(indexOfRefraction: innerRefractiveIndex / outerRefractiveIndex)
             let prismConfiguration = PrismConfiguration(position: imageSection.pivotPoint(relativeTo: prismBoardCenter, axis: generalDirection),
                                                         generalDirection: generalDirection,
-                                                        thickness: 0.5,
+                                                        thickness: 1.0,
                                                         silhouette: imageSection.silhouette(relativeTo: prismBoardCenter, axis: generalDirection),
                                                         firstFace: firstFace,
                                                         secondFace: secondFace)
@@ -68,7 +70,7 @@ struct MultiPrismView: View {
                               prismConfiguration: prismConfiguration)
 
             let prismModel = Models.constructPrism(setup.prism)
-            let rayModel = Models.constructRay(from: setup, hitRadius: 0.1, emergenceLength: 3.0)
+            let rayModel = Models.constructFullFaceRay(from: setup, startinFrom: eyePosition, onto: patternPlane)
 
             rootAnchor.addChild(prismModel)
             rootAnchor.addChild(rayModel)

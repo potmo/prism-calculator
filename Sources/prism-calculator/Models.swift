@@ -59,6 +59,54 @@ enum Models {
         return Self.rayModelFromVertices(lines: lines, color: .red, opacity: 1.0)
     }
 
+    static func constructFullFaceRay(from setup: Setup, startinFrom rayStart: Point, onto plane: Plane) -> ModelEntity {
+        // get the first face points
+        let facePoints = computeFacePolygons(prism: setup.prism).map { $0[0] }
+
+        var i: UInt32 = 0
+
+        let lines: [[Vertice]] = facePoints.map { hit in
+            let rayDirection = (rayStart - hit).normalized
+
+            let refractionPath = RefractionPath(origin: rayStart,
+                                                incomingRay: -rayDirection,
+                                                innerRefractiveIndex: 1.52,
+                                                outerRefractiveIndex: 1.000293,
+                                                firstFaceMid: setup.prism.firstFace.pivot,
+                                                firstFaceNormal: setup.prism.firstFace.normal,
+                                                secondFaceMid: setup.prism.secondFace.pivot,
+                                                secondFaceNormal: setup.prism.secondFace.normal)
+
+            guard let first = refractionPath.first, let second = refractionPath.second else {
+                return []
+            }
+
+            let planeHitPoint = RefractionPath.intersectPlane(normal: plane.normal,
+                                                              planeOrigin: plane.pivot,
+                                                              rayOrigin: second.incidencePoint,
+                                                              rayDirection: second.refractionVector)
+
+            guard let planeHitPoint else {
+                fatalError("not possible to hit the plane")
+            }
+
+            let line = [
+                first.origin,
+                first.incidencePoint,
+                second.incidencePoint,
+                planeHitPoint,
+            ].map { position in
+                let vertice = Vertice(position: position, index: i)
+                i = i + 1
+                return vertice
+            }
+
+            return line
+        }
+
+        return Self.rayModelFromVertices(lines: lines, color: .red, opacity: 1.0)
+    }
+
     static func constructRay(_ prism: Prism, rayStart: Point) -> ModelEntity {
         let rayRadius = 0.05
 
@@ -88,7 +136,6 @@ enum Models {
             let line = [
                 first.origin,
                 first.incidencePoint,
-                second.origin,
                 second.incidencePoint,
                 second.incidencePoint + second.incidenceVector * 4,
             ].map { position in
@@ -180,6 +227,7 @@ enum Models {
         }
         material.faceCulling = .back
         material.sheen = .none
+
         let mesh = try! MeshResource.generate(from: [descriptor])
 
         let model = ModelEntity(mesh: mesh, materials: [material])
@@ -188,11 +236,24 @@ enum Models {
     }
 
     static func constructPrism(_ prism: Prism) -> ModelEntity {
+        let points = Self.computeFacePolygons(prism: prism)
+
+        let lines: [[Vertice]] = points.enumerated().map { (index: Int, point: [Point]) in
+
+            return [
+                Vertice(position: point[0], index: UInt32(index * 2)),
+                Vertice(position: point[1], index: UInt32(index * 2) + 1),
+            ]
+        }
+
+        return Self.rayModelFromVertices(lines: lines, color: .blue, opacity: 0.2)
+    }
+
+    private static func computeFacePolygons(prism: Prism) -> [[Point]] {
         let prismDirection = (prism.firstFace.pivot - prism.secondFace.pivot).normalized
         let right = Vector.up.cross(prismDirection)
         let up = prismDirection.cross(right)
-
-        let lines: [[Vertice]] = prism.silhouette.enumerated().map { (index: Int, point: SIMD2<Double>) in
+        let points: [[Point]] = prism.silhouette.enumerated().map { (_: Int, point: SIMD2<Double>) in
 
             let x: Vector = right * point.x
             let y: Vector = up * point.y
@@ -213,12 +274,9 @@ enum Models {
                 fatalError("not possible to compute first or second face hits when constructing prism")
             }
 
-            return [
-                Vertice(position: firstFaceHit, index: UInt32(index * 2)),
-                Vertice(position: secondFaceHit, index: UInt32(index * 2) + 1),
-            ]
+            return [firstFaceHit, secondFaceHit]
         }
 
-        return Self.rayModelFromVertices(lines: lines, color: .blue, opacity: 0.2)
+        return points
     }
 }
